@@ -1,0 +1,9 @@
+{
+  "appId": "it.calcoloore.app",
+  "appName": "Calcolo Ore",
+  "webDir": "www",
+  "backgroundColor": "#14202b",
+  "android": {
+    "allowMixedContent": false
+  }
+}

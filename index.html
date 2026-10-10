@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14202b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Calcolo Ore</title>
+<style>
+  /* Layout: una colonna stretta, cartellino col tempo in alto, pulsante grande sotto. */
+  :root {
+    --bg: #eef1f4;
+    --surface: #ffffff;
+    --fg: #14202b;
+    --muted: #5d6b78;
+    --line: #d5dce3;
+    --accent: #0b6e8a;
+    --accent-fg: #ffffff;
+    --stop: #b3261e;
+    --stop-fg: #ffffff;
+    --result-bg: #14202b;
+    --result-fg: #f4f7f9;
+    --result-muted: #9fb0be;
+    --live: #5cc3df;
+    --font-display: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e151b;
+      --surface: #17212a;
+      --fg: #e8eef3;
+      --muted: #93a3b1;
+      --line: #2a3945;
+      --accent: #5cc3df;
+      --accent-fg: #07222b;
+      --stop: #f0877f;
+      --stop-fg: #2b0805;
+      --result-bg: #e8eef3;
+      --result-fg: #0e151b;
+      --result-muted: #4a5a67;
+      --live: #0b6e8a;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e151b;
+    --surface: #17212a;
+    --fg: #e8eef3;
+    --muted: #93a3b1;
+    --line: #2a3945;
+    --accent: #5cc3df;
+    --accent-fg: #07222b;
+    --stop: #f0877f;
+    --stop-fg: #2b0805;
+    --result-bg: #e8eef3;
+    --result-fg: #0e151b;
+    --result-muted: #4a5a67;
+    --live: #0b6e8a;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-display);
+    font-size: 16px;
+    padding-block: 20px 32px;
+    padding-inline: 16px;
+  }
+  main { max-width: 26rem; margin-inline: auto; display: grid; gap: 16px; }
+
+  h1 { font-size: 1.1rem; font-weight: 500; margin: 0; letter-spacing: 0.01em; color: var(--muted); }
+
+  .result {
+    background: var(--result-bg);
+    color: var(--result-fg);
+    border-radius: 14px;
+    padding: 22px 20px 20px;
+    display: grid;
+    gap: 8px;
+  }
+  .status {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--result-muted);
+  }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--result-muted); }
+  .running .dot { background: var(--live); animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: 0.25; } }
+  @media (prefers-reduced-motion: reduce) { .running .dot { animation: none; } }
+
+  .elapsed {
+    font-family: var(--font-mono);
+    font-weight: 500;
+    font-size: clamp(2.3rem, 12.5vw, 3.2rem);
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+  }
+  .total {
+    font-size: clamp(2.4rem, 13vw, 3.4rem);
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+  .detail {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--result-muted);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.5;
+    min-height: 1.5em;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px;
+    display: grid;
+    gap: 16px;
+  }
+  .big {
+    font: 700 1.5rem var(--font-display);
+    letter-spacing: 0.02em;
+    width: 100%;
+    min-height: 4.5rem;
+    border: 0;
+    border-radius: 12px;
+    background: var(--accent);
+    color: var(--accent-fg);
+    cursor: pointer;
+  }
+  .big.stop { background: var(--stop); color: var(--stop-fg); }
+  .ghost {
+    font: 500 0.95rem var(--font-display);
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    min-height: 3rem;
+    cursor: pointer;
+  }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  button:active { filter: brightness(0.92); }
+
+  .field { display: grid; gap: 6px; min-width: 0; }
+  label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+  .inline { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+  input {
+    width: 100%; min-width: 0;
+    font: 500 1.4rem var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--fg);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 8px 12px;
+    min-height: 3rem;
+  }
+  .unit { font-family: var(--font-mono); color: var(--muted); }
+
+  body { margin: 0; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+
+<main>
+  <h1>Calcolo ore</h1>
+
+  <section class="result" id="result" aria-live="off">
+    <div class="status"><span class="dot"></span><span id="status">Pronto</span></div>
+    <div class="elapsed" id="elapsed">00:00:00</div>
+    <div class="total" id="total">0,00 €</div>
+    <div class="detail" id="detail">Premi Avvia per far partire il conteggio.</div>
+  </section>
+
+  <section class="card">
+    <button type="button" class="big" id="main">Avvia</button>
+    <button type="button" class="ghost" id="reset" hidden>Azzera</button>
+    <div class="field">
+      <label for="rate">Tariffa</label>
+      <div class="inline">
+        <input id="rate" type="number" inputmode="decimal" min="0" step="0.5" value="12">
+        <span class="unit">€ / ora</span>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const KEY = "calcolo-ore-timer";
+  const RATE_KEY = "calcolo-ore-tariffa";
+  const eur = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" });
+  const dec = new Intl.NumberFormat("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const clock = new Intl.DateTimeFormat("it-IT", { hour: "2-digit", minute: "2-digit" });
+
+  // stato: startTs e stopTs in millisecondi; il tempo si calcola sempre dall'orologio,
+  // quindi resta corretto anche con lo schermo bloccato o la pagina in background.
+  let state = { startTs: null, stopTs: null };
+  let tick = null;
+
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY) || "null");
+    if (s && typeof s.startTs === "number") state = { startTs: s.startTs, stopTs: s.stopTs || null };
+    const r = localStorage.getItem(RATE_KEY);
+    if (r && Number(r) >= 0) $("rate").value = r;
+  } catch (e) {}
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  function rate() {
+    const r = parseFloat(String($("rate").value).replace(",", "."));
+    return isNaN(r) || r < 0 ? 0 : r;
+  }
+
+  const pad = (n) => String(n).padStart(2, "0");
+
+  function render() {
+    const running = state.startTs && !state.stopTs;
+    const done = state.startTs && state.stopTs;
+    const end = state.stopTs || Date.now();
+    const secs = state.startTs ? Math.max(0, Math.floor((end - state.startTs) / 1000)) : 0;
+    const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60;
+    const cents = Math.round((secs * rate() * 100) / 3600);
+
+    $("result").classList.toggle("running", !!running);
+    $("status").textContent = running ? "In corso" : done ? "Fermato" : "Pronto";
+    $("elapsed").textContent = pad(h) + ":" + pad(m) + ":" + pad(s);
+    $("total").textContent = eur.format(cents / 100);
+
+    if (running) {
+      $("detail").textContent = "Inizio " + clock.format(state.startTs) + " · " + dec.format(rate()) + " €/h";
+    } else if (done) {
+      $("detail").textContent = clock.format(state.startTs) + " → " + clock.format(state.stopTs) +
+        " · " + dec.format(secs / 3600) + " ore × " + dec.format(rate()) + " €/h";
+    } else {
+      $("detail").textContent = "Premi Avvia per far partire il conteggio.";
+    }
+
+    const b = $("main");
+    b.textContent = running ? "Stop" : "Avvia";
+    b.classList.toggle("stop", !!running);
+    b.hidden = !!done;
+    $("reset").hidden = !done;
+  }
+
+  function startTicking() {
+    stopTicking();
+    tick = setInterval(render, 250);
+  }
+  function stopTicking() {
+    if (tick) { clearInterval(tick); tick = null; }
+  }
+
+  $("main").addEventListener("click", () => {
+    if (!state.startTs) {
+      state = { startTs: Date.now(), stopTs: null };
+      save();
+      startTicking();
+    } else if (!state.stopTs) {
+      state.stopTs = Date.now();
+      save();
+      stopTicking();
+    }
+    render();
+  });
+
+  $("reset").addEventListener("click", () => {
+    state = { startTs: null, stopTs: null };
+    save();
+    stopTicking();
+    render();
+  });
+
+  $("rate").addEventListener("input", () => {
+    try { localStorage.setItem(RATE_KEY, $("rate").value); } catch (e) {}
+    render();
+  });
+
+  document.addEventListener("visibilitychange", render);
+
+  if (state.startTs && !state.stopTs) startTicking();
+  render();
+</script>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  }
+</script>
+
+</body>
+</html>
