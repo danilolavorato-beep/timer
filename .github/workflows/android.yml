@@ -1,0 +1,65 @@
+name: Crea l'APK per Android
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ordina i file nelle cartelle giuste
+        run: |
+          mkdir -p www assets
+          mv index.html sw.js manifest.webmanifest icon-192.png icon-512.png icon-maskable-512.png www/
+          mv icon-only.png icon-foreground.png icon-background.png splash.png splash-dark.png assets/
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Installa le dipendenze
+        run: npm ci
+
+      - name: Crea il progetto Android
+        run: npx cap add android
+
+      - name: Genera le icone
+        run: npx capacitor-assets generate --android
+
+      - name: Copia l'app nel progetto
+        run: npx cap sync android
+
+      - name: Compila l'APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Rinomina il file
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk calcolo-ore.apk
+
+      - name: Salva l'APK tra gli artefatti
+        uses: actions/upload-artifact@v4
+        with:
+          name: calcolo-ore-apk
+          path: calcolo-ore.apk
+
+      - name: Pubblica l'APK nelle Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "apk-${{ github.run_number }}" calcolo-ore.apk \
+            --title "Calcolo Ore, build ${{ github.run_number }}" \
+            --notes "APK da installare su Android. Scaricalo dal telefono e aprilo." \
+            --latest
